@@ -37,6 +37,7 @@ var Elements = function () {
     this._elements = [];
     this._quickreplies = null;
     this._listStyle = null;
+    this._buttons = null;
   }
 
   (0, _createClass3.default)(Elements, [{
@@ -47,7 +48,8 @@ var Elements = function () {
           audio = _ref.audio,
           video = _ref.video,
           subtext = _ref.subtext,
-          buttons = _ref.buttons;
+          buttons = _ref.buttons,
+          isOnlyButtons = _ref.isOnlyButtons;
 
       if (buttons) {
         if (!(buttons instanceof _Buttons2.default)) {
@@ -58,8 +60,11 @@ var Elements = function () {
           }
         }
       }
-
-      this._elements.push({ text: text, image: image, audio: audio, video: video, subtext: subtext, buttons: buttons });
+      if (buttons && isOnlyButtons) {
+        this._buttons = buttons;
+      } else {
+        this._elements.push({ text: text, image: image, audio: audio, video: video, subtext: subtext, buttons: buttons });
+      }
       return this;
     }
   }, {
@@ -130,12 +135,22 @@ var Elements = function () {
           }
 
           if (_this._listStyle) {
-            return {
-              attachment: {
-                type: 'template',
-                payload: { template_type: 'list', top_element_style: _this._listStyle, elements: elements }
-              }
-            };
+            if (_this._buttons) {
+              var buttons = _this._buttons.toJSON();
+              return {
+                attachment: {
+                  type: 'template',
+                  payload: { template_type: 'list', top_element_style: _this._listStyle, elements: elements, buttons: buttons }
+                }
+              };
+            } else {
+              return {
+                attachment: {
+                  type: 'template',
+                  payload: { template_type: 'list', top_element_style: _this._listStyle, elements: elements }
+                }
+              };
+            }
           } else if (!_this._listStyle) {
             return { attachment: { type: 'template', payload: { template_type: 'generic', elements: elements } } };
           }

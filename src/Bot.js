@@ -1,13 +1,14 @@
 import EventEmitter from 'events';
 import bodyParser from 'body-parser';
-import {Router} from 'express';
+import { Router } from 'express';
 import Elements from './Elements.js';
 import Buttons from './Buttons.js';
 import QuickReplies from './QuickReplies.js';
-import fetch from './libs/fetch.js';
 import _ from 'lodash';
+import axios from 'axios';
+import fetch from './libs/fetch';
 
-export {Elements, Buttons, QuickReplies};
+export { Elements, Buttons, QuickReplies };
 
 const userCache = {};
 
@@ -21,96 +22,63 @@ class Bot extends EventEmitter {
 
   static wait = wait;
 
-  constructor(token, verification, debug = false) {
+  constructor(verification, debug) {
     super();
-
-    this._token = token;
     this._debug = debug;
     this._verification = verification;
   }
 
-  async setGreeting(text) {
-    const {body: {result}} = await fetch('https://graph.facebook.com/v2.6/me/thread_settings', {
-      method: 'post',
-      json: true,
-      query: {access_token: this._token},
-      body: {setting_type: 'greeting', greeting: {text}}
-    });
-
-    return result;
-  }
-
-  async setGetStarted(input) {
-    if (!input) {
-      const {body: {result}} = await fetch('https://graph.facebook.com/v2.6/me/thread_settings', {
-        method: 'delete',
-        json: true,
-        query: {access_token: this._token},
-        body: {
-          setting_type: 'call_to_actions',
-          thread_state: 'new_thread'
-        }
+  async deleteFields(_fields) {
+    try {
+      const response = await axios.delete('https://graph.facebook.com/v2.6/me/messenger_profile?access_token=' + this._token, {
+        headers: { 'Content-Type': 'application/json' },
+        params: {
+          fields: _fields
+        },
       });
-
-      return result;
+      return response.result;
     }
-
-    const {data, event} = input;
-    const {body: {result}} = await fetch('https://graph.facebook.com/v2.6/me/thread_settings', {
-      method: 'post',
-      json: true,
-      query: {access_token: this._token},
-      body: {
-        setting_type: 'call_to_actions',
-        thread_state: 'new_thread',
-        call_to_actions: [{payload: JSON.stringify({data, event})}]
-      }
-    });
-
-    return result;
+    catch (error) {
+      if (error.response && error.response.data && error.response.data.error)
+        return error.response.data.error.message;
+      else if (error.response.status && error.response.statusText)
+        return error.response.status + ' - ' + error.response.statusText;
+      else return "unknown error";
+    }
   }
 
-  async setPersistentMenu(input) {
-    if (!input) {
-      const {body: {result}} = await fetch('https://graph.facebook.com/v2.6/me/thread_settings', {
-        method: 'delete',
-        json: true,
-        query: {access_token: this._token},
-        body: {
-          setting_type: 'call_to_actions',
-          thread_state: 'existing_thread'
-        }
+  async getFields(_fields) {
+    try {
+      const response = await axios.get('https://graph.facebook.com/v2.6/me/messenger_profile?access_token=' + this._token, {
+        headers: { 'Content-Type': 'application/json' },
+        params: {
+          fields: JSON.stringify(_fields),
+        },
       });
-
-      return result;
+      if (response.data) return response.data;
+      else if (response.result) return response.result;
+      else return response;
     }
-
-    const {body: {result}} = await fetch('https://graph.facebook.com/v2.6/me/thread_settings', {
-      method: 'post',
-      json: true,
-      query: {access_token: this._token},
-      body: {
-        setting_type: 'call_to_actions',
-        thread_state: 'existing_thread',
-        call_to_actions: input
-      }
-    });
-
-    return result;
+    catch (error) {
+      if (error.response && error.response.data && error.response.data.error)
+        return error.response.data.error.message;
+      else if (error.response && error.response.status && error.response.statusText)
+        return error.response.status + ' - ' + error.response.statusText;
+      else return "unknown error";
+    }
   }
-
 
   async send(to, message) {
     if (this._debug) {
-      console.log({recipient: {id: to}, message: message ? message.toJSON() : message});
+      console.log({ recipient: { id: to }, message: message ? message.toJSON() : message });
     }
 
     try {
       await fetch('https://graph.facebook.com/v2.6/me/messages', {
         method: 'post',
         json: true,
-        query: {access_token: this._token},
-        body: {recipient: {id: to}, message}
+        query: { access_token: this._token },
+        body: { recipient: { id: to }, message }
       });
     } catch (e) {
       if (e.text) {
@@ -131,15 +99,15 @@ class Bot extends EventEmitter {
 
   async senderAction(to, senderAction) {
     if (this._debug) {
-      console.log({recipient: {id: to}, senderAction});
+      console.log({ recipient: { id: to }, senderAction });
     }
 
     try {
       await fetch('https://graph.facebook.com/v2.6/me/messages', {
         method: 'post',
         json: true,
-        query: {access_token: this._token},
-        body: {recipient: {id: to}, sender_action: senderAction}
+        query: { access_token: this._token },
+        body: { recipient: { id: to }, sender_action: senderAction }
       });
     } catch (e) {
       if (e.text) {
@@ -179,8 +147,8 @@ class Bot extends EventEmitter {
       props = userCache[key];
       props.fromCache = true;
     } else {
-      const {body} = await fetch(`https://graph.facebook.com/v2.6/${id}`, {
-        query: {access_token: this._token, fields}, json: true
+      const { body } = await fetch(`https://graph.facebook.com/v2.6/${id}`, {
+        query: { access_token: this._token, fields }, json: true
       });
 
       props = body;
@@ -196,13 +164,25 @@ class Bot extends EventEmitter {
 
   async handleMessage(input) {
     const body = JSON.parse(JSON.stringify(input));
-    const message = body.entry[0].messaging[0];
-    Object.assign(message, message.message);
-    delete message.message;
+
+    // Get messaging if existis, otherwise gets standby
+    const message = body.entry[0].messaging
+      ? body.entry[0].messaging[0]
+      : body.entry[0].standby ? body.entry[0].standby[0] : null;
+
+    // Show message in beggning of handle message
+    console.log(">>> handleMessage");
+    console.log(message);
+    console.log("handleMessage <<<");
 
     message.raw = input;
 
-    message.sender.fetch = async(fields, cache) => {
+    if (message.message) {
+      Object.assign(message, message.message);
+      delete message.message;
+    }
+
+    message.sender.fetch = async (fields, cache) => {
       const props = await this.fetchUser(message.sender.id, fields, cache);
       Object.assign(message.sender, props);
       return message.sender;
@@ -210,40 +190,43 @@ class Bot extends EventEmitter {
 
     // POSTBACK
     if (message.postback) {
-      let postback = {};
-
-      try {
-        postback = JSON.parse(message.postback.payload);
-      } catch (e) {
-        // ignore
-      }
       message.isButton = true;
 
-      if (postback.hasOwnProperty('data')) {
-        message.postback = postback;
-        message.data = postback.data;
-        message.event = postback.event;
+      let postbackPayload = {};
 
-        this.emit('postback', message.event, message, message.data);
+      try {
+        postbackPayload = JSON.parse(message.postback.payload);
+        if (postbackPayload.hasOwnProperty('data')) {
+          message.postback = postbackPayload;
+          message.data = postbackPayload.data;
+          message.event = postbackPayload.event;
+          this.emit('postback', message.event, message, message.data);
 
-        if (postback.hasOwnProperty('event')) {
-          this.emit(message.event, message, message.data);
+          if (postbackPayload.hasOwnProperty('event')) {
+            this.emit(message.event, message, message.data);
+          }
         }
-      } else {
-        this.emit('invalid-postback', message, message.postback);
+      } catch (e) {
+        console.log('ERROR parsing postback.payload', postbackPayload, e);
+        this.emit(message.postback.payload, message);
       }
+      return;
+    }
 
+    // READ
+    if (message.read) {
+      this.emit('read', message, message.read);
       return;
     }
 
     // DELIVERY
     if (message.delivery) {
       Object.assign(message, message.delivery);
-      message.delivered = message.delivery.mids;
+      message.delivery = message.delivery.mids;
 
-      delete message.delivery;
+      delete message.delivery.mids;
 
-      this.emit('delivery', message, message.delivered);
+      this.emit('delivery', message, message.delivery);
       return;
     }
 
@@ -278,7 +261,7 @@ class Bot extends EventEmitter {
           this.emit(message.event, message, message.data);
         }
       } else {
-        this.emit('invalid-postback', message, message.postback);
+        this.emit('quick-reply', message, message.quick_reply);
       }
 
       return;
@@ -300,13 +283,16 @@ class Bot extends EventEmitter {
 
     if (attachments.location) {
       const location = attachments.location[0];
-      message.location = {...location, ...location.payload.coordinates};
+      message.location = { ...location, ...location.payload.coordinates };
       delete message.location.payload;
     }
 
     message.object = body.object;
 
     delete message.attachments;
+
+    if (this._debug)
+      console.log('this.emit message', message);
 
     this.emit('message', message);
   }
@@ -325,7 +311,12 @@ class Bot extends EventEmitter {
     });
 
     router.post('/', (req, res) => {
+      this._token = req.token;
       this.handleMessage(req.body);
+      if (this._debug) {
+        console.log("bot router (req.body.entry[0])");
+        console.log((req.body.entry && req.body.entry.length > 0) ? req.body.entry[0] : "received something, no body entry..");
+      }
       res.send().status(200);
     });
 
@@ -333,6 +324,6 @@ class Bot extends EventEmitter {
   }
 }
 
-export {Bot};
+export { Bot };
 
 export default Bot;

@@ -6,9 +6,10 @@ class Elements {
     this._elements = [];
     this._quickreplies = null;
     this._listStyle = null;
+    this._buttons = null;
   }
 
-  add({text, image, audio, video, subtext, buttons}) {
+  add({ text, image, audio, video, subtext, buttons, isOnlyButtons }) {
     if (buttons) {
       if (!(buttons instanceof Buttons)) {
         if (Array.isArray(buttons)) {
@@ -18,8 +19,11 @@ class Elements {
         }
       }
     }
-
-    this._elements.push({text, image, audio, video, subtext, buttons});
+    if (buttons && isOnlyButtons) {
+      this._buttons = buttons;
+    } else {
+      this._elements.push({ text, image, audio, video, subtext, buttons });
+    }
     return this;
   }
 
@@ -66,14 +70,24 @@ class Elements {
           elements.push(element);
         }
         if (this._listStyle) {
-          return {
-            attachment: {
-              type: 'template',
-              payload: {template_type: 'list', top_element_style: this._listStyle, elements}
-            }
-          };
+          if (this._buttons) {
+            const buttons = this._buttons.toJSON();
+            return {
+              attachment: {
+                type: 'template',
+                payload: { template_type: 'list', top_element_style: this._listStyle, elements, buttons }
+              }
+            };
+          } else {
+            return {
+              attachment: {
+                type: 'template',
+                payload: { template_type: 'list', top_element_style: this._listStyle, elements }
+              }
+            };
+          }
         } else if (!this._listStyle) {
-          return {attachment: {type: 'template', payload: {template_type: 'generic', elements}}};
+          return { attachment: { type: 'template', payload: { template_type: 'generic', elements } } };
         }
       } else if (this._elements.length === 1) {
         const e = this._elements[0];
@@ -83,20 +97,20 @@ class Elements {
           if (e.image) element.image_url = e.image;
           if (e.subtext) element.subtitle = e.subtext;
           element.buttons = e.buttons.toJSON();
-          return {attachment: {type: 'template', payload: {template_type: 'generic', elements: [element]}}};
+          return { attachment: { type: 'template', payload: { template_type: 'generic', elements: [element] } } };
         } else if (e.text && e.buttons && e.buttons.length) {
           element.text = e.text;
           if (e.image) element.image_url = e.image;
           element.buttons = e.buttons.toJSON();
-          return {attachment: {type: 'template', payload: {template_type: 'button', ...element}}};
+          return { attachment: { type: 'template', payload: { template_type: 'button', ...element } } };
         } else if (e.text) {
-          return {text: e.text};
+          return { text: e.text };
         } else if (e.image) {
-          return {attachment: {type: 'image', payload: {url: e.image}}};
+          return { attachment: { type: 'image', payload: { url: e.image } } };
         } else if (e.audio) {
-          return {attachment: {type: 'audio', payload: {url: e.audio}}};
+          return { attachment: { type: 'audio', payload: { url: e.audio } } };
         } else if (e.video) {
-          return {attachment: {type: 'video', payload: {url: e.video}}};
+          return { attachment: { type: 'video', payload: { url: e.video } } };
         }
       }
 

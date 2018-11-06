@@ -37,13 +37,14 @@ var QuickReplies = function () {
       var text = _ref.text,
           data = _ref.data,
           event = _ref.event,
-          isLocation = _ref.isLocation;
+          isLocation = _ref.isLocation,
+          isPhoneNumber = _ref.isPhoneNumber;
 
-      if (!data && !event && !isLocation) {
+      if (!data && !event && !isLocation && !isPhoneNumber) {
         throw Error('Must provide a url or data i.e. {data: null} or {url: \'https://facebook.com\'}');
       }
 
-      this._quickReplies.push({ text: text || 'QuickReply', event: event, data: data, isLocation: isLocation });
+      this._quickReplies.push({ text: text || 'QuickReply', event: event, data: data, isLocation: isLocation, isPhoneNumber: isPhoneNumber });
       return this;
     }
   }, {
@@ -66,8 +67,12 @@ var QuickReplies = function () {
           if (reply.isLocation) {
             contentType = 'location';
           }
-
-          quickReplies.push({ payload: payload, title: (0, _utils.cut)(String(reply.text), 20), content_type: contentType });
+          if (reply.isPhoneNumber) {
+            contentType = 'user_phone_number';
+            quickReplies.push({ payload: payload, content_type: contentType });
+          } else {
+            quickReplies.push({ payload: payload, title: (0, _utils.cut)(String(reply.text), 20), content_type: contentType });
+          }
         }
       } catch (err) {
         _didIteratorError = true;
