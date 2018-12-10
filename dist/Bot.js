@@ -428,7 +428,11 @@ var Bot = function (_EventEmitter) {
           while (1) {
             switch (_context7.prev = _context7.next) {
               case 0:
-                this.setTyping(to, true);
+                try {
+                  this.setTyping(to, true);
+                } catch (error) {
+                  console.error('startTyping error: ', error.message);
+                }
 
               case 1:
               case 'end':
@@ -546,11 +550,6 @@ var Bot = function (_EventEmitter) {
 
                 message = body.entry[0].messaging ? body.entry[0].messaging[0] : body.entry[0].standby ? body.entry[0].standby[0] : null;
 
-                // Show message in beggning of handle message
-
-                console.log(">>> handleMessage");
-                console.log(message);
-                console.log("handleMessage <<<");
 
                 message.raw = input;
 
@@ -591,7 +590,7 @@ var Bot = function (_EventEmitter) {
                 // POSTBACK
 
                 if (!message.postback) {
-                  _context11.next = 13;
+                  _context11.next = 10;
                   break;
                 }
 
@@ -618,18 +617,18 @@ var Bot = function (_EventEmitter) {
                 }
                 return _context11.abrupt('return');
 
-              case 13:
+              case 10:
                 if (!message.read) {
-                  _context11.next = 16;
+                  _context11.next = 13;
                   break;
                 }
 
                 this.emit('read', message, message.read);
                 return _context11.abrupt('return');
 
-              case 16:
+              case 13:
                 if (!message.delivery) {
-                  _context11.next = 22;
+                  _context11.next = 19;
                   break;
                 }
 
@@ -641,9 +640,9 @@ var Bot = function (_EventEmitter) {
                 this.emit('delivery', message, message.delivery);
                 return _context11.abrupt('return');
 
-              case 22:
+              case 19:
                 if (!message.optin) {
-                  _context11.next = 27;
+                  _context11.next = 24;
                   break;
                 }
 
@@ -652,9 +651,9 @@ var Bot = function (_EventEmitter) {
                 this.emit('optin', message, message.optin);
                 return _context11.abrupt('return');
 
-              case 27:
+              case 24:
                 if (!(message.quick_reply && !message.is_echo)) {
-                  _context11.next = 33;
+                  _context11.next = 30;
                   break;
                 }
 
@@ -685,7 +684,7 @@ var Bot = function (_EventEmitter) {
 
                 return _context11.abrupt('return');
 
-              case 33:
+              case 30:
                 attachments = _lodash2.default.groupBy(message.attachments, 'type');
 
 
@@ -722,7 +721,7 @@ var Bot = function (_EventEmitter) {
 
                 this.emit('message', message);
 
-              case 42:
+              case 39:
               case 'end':
                 return _context11.stop();
             }
@@ -755,16 +754,83 @@ var Bot = function (_EventEmitter) {
 
       router.post('/', function (req, res) {
         _this3._token = req.token;
-        _this3.handleMessage(req.body);
-        if (_this3._debug) {
-          console.log("bot router (req.body.entry[0])");
-          console.log(req.body.entry && req.body.entry.length > 0 ? req.body.entry[0] : "received something, no body entry..");
+        if (req.body) {
+          _this3.handleMessage(req.body);
+          if (_this3._debug) {
+            console.log("bot router (req.body.entry[0])");
+            console.log(req.body.entry && req.body.entry.length > 0 ? req.body.entry[0] : "received something, no body entry..");
+          }
         }
         res.send().status(200);
       });
 
       return router;
     }
+  }], [{
+    key: 'send_message_tag',
+    value: function () {
+      var _ref13 = (0, _bluebird.coroutine)( /*#__PURE__*/_regenerator2.default.mark(function _callee12(token, to, message) {
+        var text, err;
+        return _regenerator2.default.wrap(function _callee12$(_context12) {
+          while (1) {
+            switch (_context12.prev = _context12.next) {
+              case 0:
+                _context12.prev = 0;
+                _context12.next = 3;
+                return (0, _fetch2.default)('https://graph.facebook.com/v2.6/me/messages', {
+                  method: 'post',
+                  json: true,
+                  query: { access_token: token },
+                  body: {
+                    recipient: { id: to },
+                    message: message,
+                    messaging_type: 'MESSAGE_TAG',
+                    tag: 'SHIPPING_UPDATE'
+                  }
+                });
+
+              case 3:
+                _context12.next = 14;
+                break;
+
+              case 5:
+                _context12.prev = 5;
+                _context12.t0 = _context12['catch'](0);
+
+                if (!_context12.t0.text) {
+                  _context12.next = 13;
+                  break;
+                }
+
+                text = _context12.t0.text;
+
+                try {
+                  err = JSON.parse(_context12.t0.text).error;
+
+                  text = (err.type || 'Unknown') + ': ' + (err.message || 'No message');
+                } catch (ee) {
+                  // ignore
+                }
+
+                throw Error(text);
+
+              case 13:
+                throw _context12.t0;
+
+              case 14:
+              case 'end':
+                return _context12.stop();
+            }
+          }
+        }, _callee12, this, [[0, 5]]);
+      }));
+
+      function send_message_tag(_x18, _x19, _x20) {
+        return _ref13.apply(this, arguments);
+      }
+
+      return send_message_tag;
+    }()
   }]);
   return Bot;
 }(_events2.default);

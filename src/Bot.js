@@ -132,7 +132,12 @@ class Bot extends EventEmitter {
   }
 
   async startTyping(to) {
-    this.setTyping(to, true);
+    try {
+      this.setTyping(to, true);
+    } catch (error) {
+      console.error('startTyping error: ', error.message);
+    }
+
   }
 
   async stopTyping(to) {
@@ -169,11 +174,6 @@ class Bot extends EventEmitter {
     const message = body.entry[0].messaging
       ? body.entry[0].messaging[0]
       : body.entry[0].standby ? body.entry[0].standby[0] : null;
-
-    // Show message in beggning of handle message
-    console.log(">>> handleMessage");
-    console.log(message);
-    console.log("handleMessage <<<");
 
     message.raw = input;
 
@@ -312,16 +312,50 @@ class Bot extends EventEmitter {
 
     router.post('/', (req, res) => {
       this._token = req.token;
-      this.handleMessage(req.body);
-      if (this._debug) {
-        console.log("bot router (req.body.entry[0])");
-        console.log((req.body.entry && req.body.entry.length > 0) ? req.body.entry[0] : "received something, no body entry..");
+      if (req.body) {
+        this.handleMessage(req.body);
+        if (this._debug) {
+          console.log("bot router (req.body.entry[0])");
+          console.log((req.body.entry && req.body.entry.length > 0) ? req.body.entry[0] : "received something, no body entry..");
+        }
       }
       res.send().status(200);
     });
 
     return router;
   }
+
+  static async send_message_tag(token, to, message) {
+    try {
+      await fetch('https://graph.facebook.com/v2.6/me/messages', {
+        method: 'post',
+        json: true,
+        query: { access_token: token },
+        body: {
+          recipient: { id: to },
+          message,
+          messaging_type: 'MESSAGE_TAG',
+          tag: 'SHIPPING_UPDATE'
+        }
+      });
+    } catch (e) {
+      if (e.text) {
+        let text = e.text;
+        try {
+          const err = JSON.parse(e.text).error;
+          text = `${err.type || 'Unknown'}: ${err.message || 'No message'}`;
+        } catch (ee) {
+          // ignore
+        }
+
+        throw Error(text);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+
 }
 
 export { Bot };
