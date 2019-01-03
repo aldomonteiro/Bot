@@ -106,6 +106,10 @@ var _fetch = require('./libs/fetch');
 
 var _fetch2 = _interopRequireDefault(_fetch);
 
+var _debug = require('debug');
+
+var _debug2 = _interopRequireDefault(_debug);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 exports.Elements = _Elements2.default;
@@ -114,6 +118,8 @@ exports.QuickReplies = _QuickReplies2.default;
 
 
 var userCache = {};
+
+var debug = (0, _debug2.default)('Bot');
 
 var Bot = function (_EventEmitter) {
   (0, _inherits3.default)(Bot, _EventEmitter);
@@ -125,6 +131,7 @@ var Bot = function (_EventEmitter) {
 
     _this._debug = debug;
     _this._verification = verification;
+    _this._marketing = false;
     return _this;
   }
 
@@ -274,12 +281,8 @@ var Bot = function (_EventEmitter) {
           while (1) {
             switch (_context4.prev = _context4.next) {
               case 0:
-                if (this._debug) {
-                  console.log({ recipient: { id: to }, message: message ? message.toJSON() : message });
-                }
-
-                _context4.prev = 1;
-                _context4.next = 4;
+                _context4.prev = 0;
+                _context4.next = 3;
                 return (0, _fetch2.default)('https://graph.facebook.com/v2.6/me/messages', {
                   method: 'post',
                   json: true,
@@ -287,16 +290,16 @@ var Bot = function (_EventEmitter) {
                   body: { recipient: { id: to }, message: message }
                 });
 
-              case 4:
-                _context4.next = 15;
+              case 3:
+                _context4.next = 14;
                 break;
 
-              case 6:
-                _context4.prev = 6;
-                _context4.t0 = _context4['catch'](1);
+              case 5:
+                _context4.prev = 5;
+                _context4.t0 = _context4['catch'](0);
 
                 if (!_context4.t0.text) {
-                  _context4.next = 14;
+                  _context4.next = 13;
                   break;
                 }
 
@@ -312,15 +315,15 @@ var Bot = function (_EventEmitter) {
 
                 throw Error(text);
 
-              case 14:
+              case 13:
                 throw _context4.t0;
 
-              case 15:
+              case 14:
               case 'end':
                 return _context4.stop();
             }
           }
-        }, _callee4, this, [[1, 6]]);
+        }, _callee4, this, [[0, 5]]);
       }));
 
       function send(_x4, _x5) {
@@ -338,12 +341,8 @@ var Bot = function (_EventEmitter) {
           while (1) {
             switch (_context5.prev = _context5.next) {
               case 0:
-                if (this._debug) {
-                  console.log({ recipient: { id: to }, senderAction: _senderAction });
-                }
-
-                _context5.prev = 1;
-                _context5.next = 4;
+                _context5.prev = 0;
+                _context5.next = 3;
                 return (0, _fetch2.default)('https://graph.facebook.com/v2.6/me/messages', {
                   method: 'post',
                   json: true,
@@ -351,16 +350,16 @@ var Bot = function (_EventEmitter) {
                   body: { recipient: { id: to }, sender_action: _senderAction }
                 });
 
-              case 4:
-                _context5.next = 15;
+              case 3:
+                _context5.next = 14;
                 break;
 
-              case 6:
-                _context5.prev = 6;
-                _context5.t0 = _context5['catch'](1);
+              case 5:
+                _context5.prev = 5;
+                _context5.t0 = _context5['catch'](0);
 
                 if (!_context5.t0.text) {
-                  _context5.next = 14;
+                  _context5.next = 13;
                   break;
                 }
 
@@ -376,15 +375,15 @@ var Bot = function (_EventEmitter) {
 
                 throw Error(text);
 
-              case 14:
+              case 13:
                 throw _context5.t0;
 
-              case 15:
+              case 14:
               case 'end':
                 return _context5.stop();
             }
           }
-        }, _callee5, this, [[1, 6]]);
+        }, _callee5, this, [[0, 5]]);
       }));
 
       function senderAction(_x6, _x7) {
@@ -552,7 +551,6 @@ var Bot = function (_EventEmitter) {
 
 
                 message.raw = input;
-
                 if (message.message) {
                   (0, _assign2.default)(message, message.message);
                   delete message.message;
@@ -612,7 +610,7 @@ var Bot = function (_EventEmitter) {
                     }
                   }
                 } catch (e) {
-                  console.log('ERROR parsing postback.payload', postbackPayload, e);
+                  // console.error('ERROR parsing postback.payload', postbackPayload, e);
                   this.emit(message.postback.payload, message);
                 }
                 return _context11.abrupt('return');
@@ -717,11 +715,9 @@ var Bot = function (_EventEmitter) {
 
                 delete message.attachments;
 
-                if (this._debug) console.log('this.emit message', message);
-
                 this.emit('message', message);
 
-              case 39:
+              case 38:
               case 'end':
                 return _context11.stop();
             }
@@ -754,17 +750,23 @@ var Bot = function (_EventEmitter) {
 
       router.post('/', function (req, res) {
         _this3._token = req.token;
+        _this3._marketing = req.marketing;
+
         if (req.body) {
           _this3.handleMessage(req.body);
-          if (_this3._debug) {
-            console.log("bot router (req.body.entry[0])");
-            console.log(req.body.entry && req.body.entry.length > 0 ? req.body.entry[0] : "received something, no body entry..");
-          }
         }
         res.send().status(200);
       });
 
       return router;
+    }
+  }, {
+    key: 'marketing',
+    get: function get() {
+      return this._marketing;
+    },
+    set: function set(newMarketing) {
+      this._marketing = newMarketing;
     }
   }], [{
     key: 'send_message_tag',

@@ -7,10 +7,13 @@ import QuickReplies from './QuickReplies.js';
 import _ from 'lodash';
 import axios from 'axios';
 import fetch from './libs/fetch';
+import Debug from 'debug';
 
 export { Elements, Buttons, QuickReplies };
 
 const userCache = {};
+
+const debug = Debug('Bot');
 
 export async function wait(time) {
   return new Promise(resolve => setTimeout(() => resolve(), time));
@@ -26,6 +29,15 @@ class Bot extends EventEmitter {
     super();
     this._debug = debug;
     this._verification = verification;
+    this._marketing = false;
+  }
+
+  get marketing() {
+    return this._marketing;
+  }
+
+  set marketing(newMarketing) {
+    this._marketing = newMarketing;
   }
 
   async deleteFields(_fields) {
@@ -69,10 +81,6 @@ class Bot extends EventEmitter {
   }
 
   async send(to, message) {
-    if (this._debug) {
-      console.log({ recipient: { id: to }, message: message ? message.toJSON() : message });
-    }
-
     try {
       await fetch('https://graph.facebook.com/v2.6/me/messages', {
         method: 'post',
@@ -98,10 +106,6 @@ class Bot extends EventEmitter {
   }
 
   async senderAction(to, senderAction) {
-    if (this._debug) {
-      console.log({ recipient: { id: to }, senderAction });
-    }
-
     try {
       await fetch('https://graph.facebook.com/v2.6/me/messages', {
         method: 'post',
@@ -176,7 +180,6 @@ class Bot extends EventEmitter {
       : body.entry[0].standby ? body.entry[0].standby[0] : null;
 
     message.raw = input;
-
     if (message.message) {
       Object.assign(message, message.message);
       delete message.message;
@@ -207,7 +210,7 @@ class Bot extends EventEmitter {
           }
         }
       } catch (e) {
-        console.log('ERROR parsing postback.payload', postbackPayload, e);
+        // console.error('ERROR parsing postback.payload', postbackPayload, e);
         this.emit(message.postback.payload, message);
       }
       return;
@@ -291,9 +294,6 @@ class Bot extends EventEmitter {
 
     delete message.attachments;
 
-    if (this._debug)
-      console.log('this.emit message', message);
-
     this.emit('message', message);
   }
 
@@ -312,12 +312,10 @@ class Bot extends EventEmitter {
 
     router.post('/', (req, res) => {
       this._token = req.token;
+      this._marketing = req.marketing;
+
       if (req.body) {
         this.handleMessage(req.body);
-        if (this._debug) {
-          console.log("bot router (req.body.entry[0])");
-          console.log((req.body.entry && req.body.entry.length > 0) ? req.body.entry[0] : "received something, no body entry..");
-        }
       }
       res.send().status(200);
     });
