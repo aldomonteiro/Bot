@@ -175,126 +175,137 @@ class Bot extends EventEmitter {
     const body = JSON.parse(JSON.stringify(input));
 
     // Get messaging if existis, otherwise gets standby
+    // const message = body.entry[0].messaging
+    //   ? body.entry[0].messaging[0]
+    //   : body.entry[0].standby ? body.entry[0].standby[0] : null;
+
     const message = body.entry[0].messaging
       ? body.entry[0].messaging[0]
-      : body.entry[0].standby ? body.entry[0].standby[0] : null;
+      : null;
 
-    message.raw = input;
-    if (message.message) {
-      Object.assign(message, message.message);
-      delete message.message;
-    }
+    if (message) {
+      message.raw = input;
+      if (message.message) {
+        Object.assign(message, message.message);
+        delete message.message;
+      }
 
-    message.sender.fetch = async (fields, cache) => {
-      const props = await this.fetchUser(message.sender.id, fields, cache);
-      Object.assign(message.sender, props);
-      return message.sender;
-    };
+      message.sender.fetch = async (fields, cache) => {
+        const props = await this.fetchUser(message.sender.id, fields, cache);
+        Object.assign(message.sender, props);
+        return message.sender;
+      };
 
-    // POSTBACK
-    if (message.postback) {
-      message.isButton = true;
+      // POSTBACK
+      if (message.postback) {
+        message.isButton = true;
 
-      let postbackPayload = {};
+        let postbackPayload = {};
 
-      try {
-        postbackPayload = JSON.parse(message.postback.payload);
-        if (postbackPayload.hasOwnProperty('data')) {
-          message.postback = postbackPayload;
-          message.data = postbackPayload.data;
-          message.event = postbackPayload.event;
+        try {
+          postbackPayload = JSON.parse(message.postback.payload);
+          if (postbackPayload.hasOwnProperty('data')) {
+            message.postback = postbackPayload;
+            message.data = postbackPayload.data;
+            message.event = postbackPayload.event;
+            this.emit('postback', message.event, message, message.data);
+
+            if (postbackPayload.hasOwnProperty('event')) {
+              this.emit(message.event, message, message.data);
+            }
+          }
+        } catch (e) {
+          // console.error('ERROR parsing postback.payload', postbackPayload, e);
+          this.emit(message.postback.payload, message);
+        }
+        return;
+      }
+
+      // READ
+      if (message.read) {
+        this.emit('read', message, message.read);
+        return;
+      }
+
+      // DELIVERY
+      if (message.delivery) {
+        Object.assign(message, message.delivery);
+        message.delivery = message.delivery.mids;
+
+        delete message.delivery.mids;
+
+        this.emit('delivery', message, message.delivery);
+        return;
+      }
+
+      // OPTIN
+      if (message.optin) {
+        message.param = message.optin.ref || true;
+        message.optin = message.param;
+        this.emit('optin', message, message.optin);
+        return;
+      }
+
+      // QUICK_REPLY
+      if (message.quick_reply && !message.is_echo) {
+        let postback = {};
+
+        try {
+          postback = JSON.parse(message.quick_reply.payload) || {};
+        } catch (e) {
+          // ignore
+        }
+
+        message.isQuickReply = true;
+
+        if (postback.hasOwnProperty('data')) {
+          message.postback = postback;
+          message.data = postback.data;
+          message.event = postback.event;
+
           this.emit('postback', message.event, message, message.data);
 
-          if (postbackPayload.hasOwnProperty('event')) {
+          if (postback.hasOwnProperty('event')) {
             this.emit(message.event, message, message.data);
           }
+        } else {
+          this.emit('quick-reply', message, message.quick_reply);
         }
-      } catch (e) {
-        // console.error('ERROR parsing postback.payload', postbackPayload, e);
-        this.emit(message.postback.payload, message);
-      }
-      return;
-    }
 
-    // READ
-    if (message.read) {
-      this.emit('read', message, message.read);
-      return;
-    }
-
-    // DELIVERY
-    if (message.delivery) {
-      Object.assign(message, message.delivery);
-      message.delivery = message.delivery.mids;
-
-      delete message.delivery.mids;
-
-      this.emit('delivery', message, message.delivery);
-      return;
-    }
-
-    // OPTIN
-    if (message.optin) {
-      message.param = message.optin.ref || true;
-      message.optin = message.param;
-      this.emit('optin', message, message.optin);
-      return;
-    }
-
-    // QUICK_REPLY
-    if (message.quick_reply && !message.is_echo) {
-      let postback = {};
-
-      try {
-        postback = JSON.parse(message.quick_reply.payload) || {};
-      } catch (e) {
-        // ignore
+        return;
       }
 
-      message.isQuickReply = true;
+      const attachments = _.groupBy(message.attachments, 'type');
 
-      if (postback.hasOwnProperty('data')) {
-        message.postback = postback;
-        message.data = postback.data;
-        message.event = postback.event;
-
-        this.emit('postback', message.event, message, message.data);
-
-        if (postback.hasOwnProperty('event')) {
-          this.emit(message.event, message, message.data);
-        }
-      } else {
-        this.emit('quick-reply', message, message.quick_reply);
+      if (attachments.image) {
+        message.images = attachments.image.map(a => a.payload.url);
       }
 
-      return;
+      if (attachments.video) {
+        message.videos = attachments.video.map(a => a.payload.url);
+      }
+
+      if (attachments.audio) {
+        message.audio = attachments.audio.map(a => a.payload.url)[0];
+      }
+
+      if (attachments.location) {
+        const location = attachments.location[0];
+        message.location = { ...location, ...location.payload.coordinates };
+        delete message.location.payload;
+      }
+
+      message.object = body.object;
+
+      delete message.attachments;
+
+      this.emit('message', message);
+    } else {
+      const msgStandBy = body.entry[0].standby ? body.entry[0].standby[0] : null;
+      if (msgStandBy) {
+        console.info(`\x1b[46m Standby\x1b[0m, text:\x1b[32m${msgStandBy.message && msgStandBy.message.text}\x1b[0m`);
+      }
     }
-
-    const attachments = _.groupBy(message.attachments, 'type');
-
-    if (attachments.image) {
-      message.images = attachments.image.map(a => a.payload.url);
-    }
-
-    if (attachments.video) {
-      message.videos = attachments.video.map(a => a.payload.url);
-    }
-
-    if (attachments.audio) {
-      message.audio = attachments.audio.map(a => a.payload.url)[0];
-    }
-
-    if (attachments.location) {
-      const location = attachments.location[0];
-      message.location = { ...location, ...location.payload.coordinates };
-      delete message.location.payload;
-    }
-
-    message.object = body.object;
-
-    delete message.attachments;
-
-    this.emit('message', message);
   }
 
   router() {

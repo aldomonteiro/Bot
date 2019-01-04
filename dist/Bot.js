@@ -538,7 +538,7 @@ var Bot = function (_EventEmitter) {
       var _ref11 = (0, _bluebird.coroutine)( /*#__PURE__*/_regenerator2.default.mark(function _callee11(input) {
         var _this2 = this;
 
-        var body, message, postbackPayload, postback, attachments, location;
+        var body, message, postbackPayload, postback, attachments, location, msgStandBy;
         return _regenerator2.default.wrap(function _callee11$(_context11) {
           while (1) {
             switch (_context11.prev = _context11.next) {
@@ -546,9 +546,16 @@ var Bot = function (_EventEmitter) {
                 body = JSON.parse((0, _stringify2.default)(input));
 
                 // Get messaging if existis, otherwise gets standby
+                // const message = body.entry[0].messaging
+                //   ? body.entry[0].messaging[0]
+                //   : body.entry[0].standby ? body.entry[0].standby[0] : null;
 
-                message = body.entry[0].messaging ? body.entry[0].messaging[0] : body.entry[0].standby ? body.entry[0].standby[0] : null;
+                message = body.entry[0].messaging ? body.entry[0].messaging[0] : null;
 
+                if (!message) {
+                  _context11.next = 41;
+                  break;
+                }
 
                 message.raw = input;
                 if (message.message) {
@@ -588,7 +595,7 @@ var Bot = function (_EventEmitter) {
                 // POSTBACK
 
                 if (!message.postback) {
-                  _context11.next = 10;
+                  _context11.next = 11;
                   break;
                 }
 
@@ -615,18 +622,18 @@ var Bot = function (_EventEmitter) {
                 }
                 return _context11.abrupt('return');
 
-              case 10:
+              case 11:
                 if (!message.read) {
-                  _context11.next = 13;
+                  _context11.next = 14;
                   break;
                 }
 
                 this.emit('read', message, message.read);
                 return _context11.abrupt('return');
 
-              case 13:
+              case 14:
                 if (!message.delivery) {
-                  _context11.next = 19;
+                  _context11.next = 20;
                   break;
                 }
 
@@ -638,9 +645,9 @@ var Bot = function (_EventEmitter) {
                 this.emit('delivery', message, message.delivery);
                 return _context11.abrupt('return');
 
-              case 19:
+              case 20:
                 if (!message.optin) {
-                  _context11.next = 24;
+                  _context11.next = 25;
                   break;
                 }
 
@@ -649,9 +656,9 @@ var Bot = function (_EventEmitter) {
                 this.emit('optin', message, message.optin);
                 return _context11.abrupt('return');
 
-              case 24:
+              case 25:
                 if (!(message.quick_reply && !message.is_echo)) {
-                  _context11.next = 30;
+                  _context11.next = 31;
                   break;
                 }
 
@@ -682,7 +689,7 @@ var Bot = function (_EventEmitter) {
 
                 return _context11.abrupt('return');
 
-              case 30:
+              case 31:
                 attachments = _lodash2.default.groupBy(message.attachments, 'type');
 
 
@@ -716,8 +723,17 @@ var Bot = function (_EventEmitter) {
                 delete message.attachments;
 
                 this.emit('message', message);
+                _context11.next = 43;
+                break;
 
-              case 38:
+              case 41:
+                msgStandBy = body.entry[0].standby ? body.entry[0].standby[0] : null;
+
+                if (msgStandBy) {
+                  console.info('\x1B[46m Standby\x1B[0m, text:\x1B[32m' + (msgStandBy.message && msgStandBy.message.text) + '\x1B[0m');
+                }
+
+              case 43:
               case 'end':
                 return _context11.stop();
             }
